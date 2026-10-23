@@ -401,7 +401,7 @@ function okFinal(v){
   return V&&V.limit>0&&okArr(v,0)&&v.every((x,i)=>!S.given[i]||x===S.sol[i]);
 }
 function vsResolve(){
-  if(!(V&&V.phase==='playing'&&S.timeUp&&!V.result))return;
+  if(!(V&&V.phase==='playing'&&S.timeUp&&(!V.result||V.result==='unknown')))return;
   const me=stats(S.vals);
   clearTimeout(V.finalTimer);
   if(!V.oppFinal){
@@ -655,7 +655,7 @@ function showResult(txt,sub,view){
 function vsLeave(msg){
   const v=V;V=null;
   if(v){
-    clearTimeout(v.finalTimer);
+    clearTimeout(v.finalTimer);clearTimeout(v.hiTimer);
     try{if(v.conn)v.conn.close()}catch(e){}
     try{if(v.peer)v.peer.destroy()}catch(e){}
   }
@@ -681,7 +681,12 @@ function wire(conn){
 }
 function onMsg(m){
   if(!V||!m||typeof m!=='object')return;
-  if(m.t==='start'&&V.role==='guest'){
+  if(m.t==='hi'&&V.role==='host'){
+    if(m.v===2&&!V.oppV){
+      V.oppV=2;
+      if(V.hiTimer){clearTimeout(V.hiTimer);V.hiTimer=null;startMatch()}
+    }
+  }else if(m.t==='start'&&V.role==='guest'){
     if(validStart(m))beginMatch(m.diff,m.sol,m.puz,m.limit);else vsStatus('收到無效的題目資料');
   }else if(m.t==='prog'&&V.phase==='playing'){
     if(Number.isInteger(m.n)&&m.n>=0&&m.n<=V.total){V.oppFilled=m.n;renderVS()}
@@ -731,7 +736,18 @@ function vsHost(){
     peer.on('connection',conn=>{
       if(!V||V.peer!==peer||V.conn){conn.close();return}
       V.conn=conn;wire(conn);
-      conn.on('open',()=>startMatch());
+      conn.on('open',()=>{
+        // 限時對戰要求對手是新版：舊版不認得時間限制，會變成一邊倒數、一邊不限時
+        if(V.limit<=0){startMatch();return}
+        V.hiTimer=setTimeout(()=>{
+          if(V&&V.conn===conn&&!V.oppV){
+            V.hiTimer=null;
+            V.conn=null;try{conn.close()}catch(e){}
+            vsStatus('對手的頁面是舊版，無法進行限時對戰。請對手把頁面重新開啟兩次更新後再加入');
+            renderVS();
+          }
+        },2500);
+      });
     });
     peer.on('error',err=>{
       if(!V||V.peer!==peer)return;
@@ -753,7 +769,10 @@ function vsJoin(){
     if(!V||V.peer!==peer)return;
     const conn=peer.connect(PREFIX+c,{reliable:true});
     V.conn=conn;wire(conn);
-    conn.on('open',()=>{if(V&&V.conn===conn&&V.phase==='joining')vsStatus('已連線，等待房主開始…')});
+    conn.on('open',()=>{
+      if(V&&V.conn===conn&&V.phase==='joining')vsStatus('已連線，等待房主開始…');
+      try{conn.send({t:'hi',v:2})}catch(e){}
+    });
     setTimeout(()=>{if(V&&V.conn===conn&&V.phase==='joining'&&!conn.open)vsStatus('連線逾時，請確認代碼與網路')},10000);
   });
   peer.on('error',err=>{
