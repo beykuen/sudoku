@@ -13,7 +13,7 @@
 <script src="peerjs.min.js"></script>
 <script src="qrcode.js"></script>
 <style>
-:root{--bscale:1;--dscale:.6;--padh:64px;--bg:#ffffff;--fg:#111111;--line:#888888;--strong:#111111;--cellbg:#ffffff;--given:#111111;--user:#1d4ed8;--hinted:#0a7a3d;--errbg:#ffd6d6;--errfg:#c00000;--rel:#eef3fb;--same:#bcd6ff;--sel:#ffd966;--muted:#444444;--btnbg:#ffffff;--btnfg:#111111;--onbg:#111111;--onfg:#ffffff;--opp:#c2410c;--press:#ffd966;--overlay:rgba(255,255,255,.96);--b:calc(min(92vw,60vh)*var(--bscale))}
+:root{--bscale:1;--dscale:.6;--padh:64px;--bg:#ffffff;--fg:#111111;--line:#888888;--strong:#111111;--cellbg:#ffffff;--given:#111111;--user:#1d4ed8;--hinted:#0a7a3d;--errbg:#ffd6d6;--errfg:#c00000;--okbg:#c8f0d2;--rel:#eef3fb;--same:#bcd6ff;--sel:#ffd966;--muted:#444444;--btnbg:#ffffff;--btnfg:#111111;--onbg:#111111;--onfg:#ffffff;--opp:#c2410c;--press:#ffd966;--overlay:rgba(255,255,255,.96);--b:calc(min(92vw,60vh)*var(--bscale))}
 html{background:var(--bg)}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,"PingFang TC",sans-serif;-webkit-user-select:none;user-select:none;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
@@ -46,6 +46,7 @@ button{font-family:inherit}
 .cell.rel{background:var(--rel)}
 .cell.same{background:var(--same)}
 .cell.sel{background:var(--sel)}
+.cell.ok{background:var(--okbg)}
 .cell.err{background:var(--errbg);color:var(--errfg)}
 .cell.ans{color:var(--hinted)}
 .notes{position:absolute;inset:0;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);font-size:calc(var(--b)/9*.27);font-weight:700;color:var(--muted);text-align:center;line-height:1}
@@ -300,14 +301,16 @@ function showOverlay(txt,sub,again,leave,view){
   renderResultBtn();
 }
 function renderResultBtn(){
-  $('#resultBtn').style.display=(S&&S.done&&S.timeUp&&lastOverlay)?'block':'none';
+  $('#resultBtn').style.display=(S&&S.done&&S.reveal&&lastOverlay)?'block':'none';
 }
+// 對戰結束（不論輸贏）：公布答案並標示自己填對（綠底）與填錯（紅底）的格子
+function vsMark(){S.reveal=true;S.mark=true;sel=-1;showErr=false;render();return statTxt(stats(S.vals))}
 function win(){
   S.done=true;
   if(V&&V.phase==='playing'){
     V.result='win';
     vsSend({t:'win',sec:S.sec});
-    showResult('你贏了！用時 '+fmt(S.sec));
+    showResult('你贏了！用時 '+fmt(S.sec),vsMark());
     return;
   }
   save();
@@ -378,7 +381,7 @@ function timeUp(){
   if(V&&V.phase==='playing'){
     // 對戰：把自己的盤面交給對手，雙方各自用同一份答案驗證，結果才會一致
     vsSend({t:'final',vals:S.vals.slice()});
-    render();vsResolve();
+    S.mark=true;render();vsResolve();
     return;
   }
   save();render();showSoloEnd();
@@ -452,6 +455,7 @@ function render(){
       else if(CFG.hlSame&&sv&&v===sv)cls+=' same';
       else if(CFG.hlRel&&PEERS[sel].includes(i))cls+=' rel';
     }
+    if(rv&&S.mark&&!S.given[i]&&v&&v===S.sol[i])cls+=' ok';
     if(errSet.has(i))cls+=' err';
     if(miss)cls+=' ans';
     el.className=cls;
@@ -485,10 +489,10 @@ function render(){
 const CFG_KEY='sudoku-settings-v1';
 const CKEYS=[['given','給定數字'],['user','自填數字'],['hinted','提示數字'],['errfg','錯誤文字'],['sel','選取格'],['same','相同數字'],['rel','同列行宮']];
 const THEMES={
-  white:{bg:'#ffffff',fg:'#111111',line:'#888888',strong:'#111111',cellbg:'#ffffff',given:'#111111',user:'#1d4ed8',hinted:'#0a7a3d',errbg:'#ffd6d6',errfg:'#c00000',rel:'#eef3fb',same:'#bcd6ff',sel:'#ffd966',muted:'#444444',btnbg:'#ffffff',btnfg:'#111111',onbg:'#111111',onfg:'#ffffff',opp:'#c2410c',press:'#ffd966',overlay:'rgba(255,255,255,.96)'},
-  dark:{bg:'#121212',fg:'#f2f2f2',line:'#5a5a5a',strong:'#d0d0d0',cellbg:'#1c1c1e',given:'#f5f5f5',user:'#7db4ff',hinted:'#5fd38d',errbg:'#5c1f1f',errfg:'#ff8a8a',rel:'#2a2f3a',same:'#2f4f86',sel:'#7a5c00',muted:'#b0b0b0',btnbg:'#1c1c1e',btnfg:'#f2f2f2',onbg:'#f2f2f2',onfg:'#121212',opp:'#ff9a5a',press:'#7a5c00',overlay:'rgba(18,18,18,.96)'},
-  cream:{bg:'#f6efdc',fg:'#3b2f1e',line:'#b8a98a',strong:'#3b2f1e',cellbg:'#fbf6e8',given:'#2b2114',user:'#1e4fa3',hinted:'#1f6b3a',errbg:'#f4c7b8',errfg:'#a1260f',rel:'#efe4c6',same:'#d9c690',sel:'#f2c45a',muted:'#6b5a3e',btnbg:'#fbf6e8',btnfg:'#3b2f1e',onbg:'#3b2f1e',onfg:'#fbf6e8',opp:'#b4501a',press:'#f2c45a',overlay:'rgba(246,239,220,.96)'},
-  contrast:{bg:'#ffffff',fg:'#000000',line:'#000000',strong:'#000000',cellbg:'#ffffff',given:'#000000',user:'#0000ee',hinted:'#006400',errbg:'#ffff00',errfg:'#d00000',rel:'#e6e6e6',same:'#9ec5ff',sel:'#ffb000',muted:'#000000',btnbg:'#ffffff',btnfg:'#000000',onbg:'#000000',onfg:'#ffffff',opp:'#b00000',press:'#ffb000',overlay:'rgba(255,255,255,1)'}
+  white:{bg:'#ffffff',fg:'#111111',line:'#888888',strong:'#111111',cellbg:'#ffffff',given:'#111111',user:'#1d4ed8',hinted:'#0a7a3d',errbg:'#ffd6d6',errfg:'#c00000',okbg:'#c8f0d2',rel:'#eef3fb',same:'#bcd6ff',sel:'#ffd966',muted:'#444444',btnbg:'#ffffff',btnfg:'#111111',onbg:'#111111',onfg:'#ffffff',opp:'#c2410c',press:'#ffd966',overlay:'rgba(255,255,255,.96)'},
+  dark:{bg:'#121212',fg:'#f2f2f2',line:'#5a5a5a',strong:'#d0d0d0',cellbg:'#1c1c1e',given:'#f5f5f5',user:'#7db4ff',hinted:'#5fd38d',errbg:'#5c1f1f',errfg:'#ff8a8a',okbg:'#1d4a2c',rel:'#2a2f3a',same:'#2f4f86',sel:'#7a5c00',muted:'#b0b0b0',btnbg:'#1c1c1e',btnfg:'#f2f2f2',onbg:'#f2f2f2',onfg:'#121212',opp:'#ff9a5a',press:'#7a5c00',overlay:'rgba(18,18,18,.96)'},
+  cream:{bg:'#f6efdc',fg:'#3b2f1e',line:'#b8a98a',strong:'#3b2f1e',cellbg:'#fbf6e8',given:'#2b2114',user:'#1e4fa3',hinted:'#1f6b3a',errbg:'#f4c7b8',errfg:'#a1260f',okbg:'#cfe3b5',rel:'#efe4c6',same:'#d9c690',sel:'#f2c45a',muted:'#6b5a3e',btnbg:'#fbf6e8',btnfg:'#3b2f1e',onbg:'#3b2f1e',onfg:'#fbf6e8',opp:'#b4501a',press:'#f2c45a',overlay:'rgba(246,239,220,.96)'},
+  contrast:{bg:'#ffffff',fg:'#000000',line:'#000000',strong:'#000000',cellbg:'#ffffff',given:'#000000',user:'#0000ee',hinted:'#006400',errbg:'#ffff00',errfg:'#d00000',okbg:'#9cf09c',rel:'#e6e6e6',same:'#9ec5ff',sel:'#ffb000',muted:'#000000',btnbg:'#ffffff',btnfg:'#000000',onbg:'#000000',onfg:'#ffffff',opp:'#b00000',press:'#ffb000',overlay:'rgba(255,255,255,1)'}
 };
 function defCfg(){return {theme:'white',custom:{},bscale:100,dscale:60,padh:64,hlRel:true,hlSame:true,showLeft:true,boardSide:'left',padPos:'down',limitMin:0,vsLimitMin:0,hints:Object.assign({},HINTS)}}
 function clamp(v,a,b,d){v=Number(v);return Number.isFinite(v)?Math.min(b,Math.max(a,Math.round(v))):d}
@@ -671,7 +675,7 @@ function wire(conn){
   conn.on('close',()=>{
     if(!V||V.conn!==conn)return;
     if(V.phase==='playing'){
-      if(!S.done){S.done=true;V.result='win';showResult('對手已離線，你獲勝','對手已離線')}
+      if(!S.done){S.done=true;V.result='win';showResult('對手已離線，你獲勝','對手已離線\n'+vsMark())}
       else if(S.timeUp&&!V.result){clearTimeout(V.finalTimer);V.result='win';showResult('對手已離線，你獲勝','對手已離線')}
       else{$('#winBtn').style.display='none';$('#winSub').textContent='對手已離線'}
       V.conn=null;
@@ -704,7 +708,7 @@ function oppWin(sec){
   }
   clearTimeout(V.finalTimer);
   V.result='lose';S.done=true;
-  showResult('對手先完成了，你輸了');
+  showResult('對手先完成了，你輸了',vsMark());
 }
 function beginMatch(diff,sol,puz,limit){
   if(!backup)backup=S;
