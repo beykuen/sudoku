@@ -66,7 +66,7 @@ button{font-family:inherit}
 #pad.jammed button{opacity:.3}
 #vsRule.jam{color:var(--errfg);font-weight:800}
 .shield{font-weight:800;color:var(--hinted);white-space:nowrap}
-#emoFly{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);font-size:110px;line-height:1;pointer-events:none;display:none;z-index:5}
+#emoFly{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);font-size:calc(110px*var(--emosz,1));line-height:1;pointer-events:none;display:none;z-index:5}
 #vsPick{display:none;gap:8px;flex-wrap:nowrap}
 #vsPick button{min-height:44px;padding:4px 6px;font-size:18px}
 .cOnly{display:none}
@@ -215,6 +215,9 @@ body.pad-up #toast{order:3}
   <div class="info" style="font-size:16px;margin-bottom:6px">每格輸入一個表情（可用表情鍵盤）</div>
   <div class="row" id="setEmos" style="flex-wrap:nowrap"></div>
   <button class="btn" id="setEmoReset" style="min-height:44px;margin-top:8px;width:100%">表情還原預設</button>
+  <div class="info" style="font-size:16px;margin:10px 0 4px">對手畫面上的顯示方式（房主建立房間時套用到雙方）</div>
+  <div class="stepper"><span class="lab wide">大小</span><button type="button" id="emoSzDn">－</button><span class="val wide" id="emoSzV"></span><button type="button" id="emoSzUp">＋</button></div>
+  <div class="row"><span class="info">位置</span><div class="seg" id="setEmoPos"><button data-v="center">棋盤中央</button><button data-v="rand">隨機位置</button></div></div>
   <h3>版面</h3>
   <div class="row"><span class="info">精簡版面（遊戲中）</span><div class="seg" id="setCompact"><button data-v="auto">放不下時</button><button data-v="on">一律</button><button data-v="off">不用</button></div></div>
   <div class="info" style="font-size:16px;margin:4px 0 8px">拿掉標題列（計時和設定移到按鈕列）、對戰說明平常不顯示、兩條進度列併成一行</div>
@@ -569,13 +572,17 @@ const THEMES={
 const JLIM={gap:[5,30,1],max:[1,5,1],shields:[0,5,1],hold:[1,5,1],pause:[5,20,5],cover:[10,40,5],shuffle:[10,40,5],nonotes:[10,40,5]};
 // 表情：預設 5 個，可自訂；收到的表情一樣要驗證（只接受單一個表情符號）
 const EMO_DEF=['👍','😂','😱','😤','🔥'];
+// 表情大小 0.5–2 倍、每次 0.5（使用者指定）；位置：棋盤中央或隨機一處
+const EMO_SIZES=[0.5,1,1.5,2];
+function okEmoSize(v){return EMO_SIZES.includes(v)}
+function okEmoCfg(o){return !!o&&typeof o==='object'&&okEmoSize(o.size)&&typeof o.rand==='boolean'}
 function okEmo(x){
   if(typeof x!=='string'||!x||x.length>16)return false;
   if(typeof Intl!=='undefined'&&Intl.Segmenter){const g=[...new Intl.Segmenter().segment(x)];if(g.length!==1)return false}
   return /^(\p{Extended_Pictographic}|\p{Regional_Indicator})/u.test(x)&&!/[\p{L}\p{N}<>&]/u.test(x.replace(/[\u{1F1E6}-\u{1F1FF}]/gu,''));
 }
 const JAM_DEF={gap:10,max:2,shields:3,hold:1,pause:10,cover:20,shuffle:20,nonotes:20};
-function defCfg(){return {theme:'white',custom:{},bscale:100,dscale:60,padh:64,hlRel:true,hlSame:true,showLeft:true,boardSide:'left',padPos:'down',limitMin:0,vsLimitMin:0,vsJam:false,jam:Object.assign({},JAM_DEF),compact:'auto',emos:EMO_DEF.slice(),hints:Object.assign({},HINTS)}}
+function defCfg(){return {theme:'white',custom:{},bscale:100,dscale:60,padh:64,hlRel:true,hlSame:true,showLeft:true,boardSide:'left',padPos:'down',limitMin:0,vsLimitMin:0,vsJam:false,jam:Object.assign({},JAM_DEF),compact:'auto',emos:EMO_DEF.slice(),emoSize:1,emoRand:false,hints:Object.assign({},HINTS)}}
 function clamp(v,a,b,d){v=Number(v);return Number.isFinite(v)?Math.min(b,Math.max(a,Math.round(v))):d}
 function loadCfg(){
   // 儲存的資料也不盲信：逐項驗證
@@ -593,6 +600,8 @@ function loadCfg(){
       c.limitMin=lim(s.limitMin);c.vsLimitMin=lim(s.vsLimitMin);
       if(typeof s.vsJam==='boolean')c.vsJam=s.vsJam;
       if(['auto','on','off'].includes(s.compact))c.compact=s.compact;
+      if(okEmoSize(s.emoSize))c.emoSize=s.emoSize;
+      if(typeof s.emoRand==='boolean')c.emoRand=s.emoRand;
       if(Array.isArray(s.emos)&&s.emos.length===5&&s.emos.every(okEmo))c.emos=s.emos.slice();
       if(s.jam&&typeof s.jam==='object')for(const k in JLIM){const v=s.jam[k],[lo,hi]=JLIM[k];if(Number.isInteger(v)&&v>=lo&&v<=hi)c.jam[k]=v}
       if(s.hints&&typeof s.hints==='object')for(const k of Object.keys(HINTS)){const n=s.hints[k];if(Number.isInteger(n)&&n>=0&&n<=9)c.hints[k]=n}
@@ -617,6 +626,8 @@ function applyCfg(){
   document.querySelectorAll('#setTheme button').forEach(b=>b.classList.toggle('on',b.dataset.t===CFG.theme));
   document.querySelectorAll('#setSide button').forEach(b=>b.classList.toggle('on',b.dataset.v===CFG.boardSide));
   document.querySelectorAll('#setCompact button').forEach(b=>b.classList.toggle('on',b.dataset.v===CFG.compact));
+  $('#emoSzV').textContent=CFG.emoSize+' 倍';
+  document.querySelectorAll('#setEmoPos button').forEach(b=>b.classList.toggle('on',(b.dataset.v==='rand')===CFG.emoRand));
   for(let i=0;i<5;i++){const el=document.getElementById('emo_'+i);if(el&&document.activeElement!==el)el.value=CFG.emos[i]}
   try{if(S)fitBoard()}catch(e){}
   document.querySelectorAll('#setPad button').forEach(b=>b.classList.toggle('on',b.dataset.v===CFG.padPos));
@@ -656,6 +667,9 @@ for(let i=0;i<5;i++){
   $('#setEmos').appendChild(inp);
 }
 $('#setEmoReset').onclick=()=>{CFG.emos=EMO_DEF.slice();cfgChanged()};
+const emoStep=d=>{const i=EMO_SIZES.indexOf(CFG.emoSize)+d;if(i>=0&&i<EMO_SIZES.length){CFG.emoSize=EMO_SIZES[i];cfgChanged()}};
+$('#emoSzDn').onclick=()=>emoStep(-1);$('#emoSzUp').onclick=()=>emoStep(1);
+document.querySelectorAll('#setEmoPos button').forEach(b=>b.onclick=()=>{CFG.emoRand=b.dataset.v==='rand';cfgChanged()});
 document.querySelectorAll('#setSide button').forEach(b=>b.onclick=()=>{CFG.boardSide=b.dataset.v;cfgChanged()});
 document.querySelectorAll('#setPad button').forEach(b=>b.onclick=()=>{CFG.padPos=b.dataset.v;cfgChanged()});
 $('#setColorReset').onclick=()=>{CFG.custom={};cfgChanged()};
@@ -864,7 +878,15 @@ function gotEmo(m){
   if(!(V&&V.phase==='playing')||!okEmo(e))return;
   if(Date.now()-(V.emoGot||0)<1000)return;
   V.emoGot=Date.now();
-  const f=$('#emoFly');f.textContent=e;f.style.display='block';
+  const f=$('#emoFly'),cfg=V.emo||{size:1,rand:false};
+  f.textContent=e;f.style.setProperty('--emosz',cfg.size);
+  f.style.left='';f.style.top='';f.style.display='block';
+  if(cfg.rand){
+    // 隨機一處：先量表情實際大小，讓整個表情落在棋盤內（比棋盤大就置中）
+    const bw=board.offsetWidth,bh=board.offsetHeight,ew=f.offsetWidth,eh=f.offsetHeight;
+    f.style.left=(board.offsetLeft+ew/2+Math.random()*Math.max(0,bw-ew))+'px';
+    f.style.top=(board.offsetTop+eh/2+Math.random()*Math.max(0,bh-eh))+'px';
+  }
   clearTimeout(V.emoTimer);V.emoTimer=setTimeout(()=>{f.style.display='none'},EMO_MS);
 }
 function jamRecord(){
@@ -895,6 +917,7 @@ function validStart(m){
   if(!okArr(m.puz,0)||!okArr(m.sol,1))return false;
   if(!Number.isInteger(m.limit)||m.limit<0||m.limit>7200)return false;
   if(m.jam!==undefined&&m.jam!==false&&!okJamCfg(m.jam))return false;
+  if(m.emo!==undefined&&!okEmoCfg(m.emo))return false;
   if(!m.puz.every((v,i)=>v===0||v===m.sol[i]))return false;
   return m.sol.every((v,i)=>PEERS[i].every(p=>m.sol[p]!==v));
 }
@@ -979,7 +1002,7 @@ function onMsg(m){
       }
     }
   }else if(m.t==='start'&&V.role==='guest'){
-    if(validStart(m))beginMatch(m.diff,m.sol,m.puz,m.limit,m.jam||null);else vsStatus('收到無效的題目資料');
+    if(validStart(m))beginMatch(m.diff,m.sol,m.puz,m.limit,m.jam||null,m.emo);else vsStatus('收到無效的題目資料');
   }else if(m.t==='prog'&&V.phase==='playing'){
     if(Number.isInteger(m.n)&&m.n>=0&&m.n<=V.total){V.oppFilled=m.n;renderVS()}
   }else if(m.t==='win'&&V.phase==='playing'&&typeof m.sec==='number'){
@@ -1007,7 +1030,9 @@ function oppWin(sec){
   V.result='lose';S.done=true;
   showResult('對手先完成了，你輸了',vsMark());
 }
-function beginMatch(diff,sol,puz,limit,jam){
+function beginMatch(diff,sol,puz,limit,jam,emo){
+  // 舊版房主不送 emo：用預設（中央、1 倍）
+  V.emo=okEmoCfg(emo)?{size:emo.size,rand:emo.rand}:{size:1,rand:false};
   if(!backup)backup=S;
   S=makeState(diff,sol,puz,true,limit);
   clearTimeout(V.finalTimer);
@@ -1023,8 +1048,8 @@ function startMatch(){
   setTimeout(()=>{
     if(!V||V.role!=='host'||!V.conn||!V.conn.open)return;
     const {sol,puz}=generate(V.diff);
-    vsSend({t:'start',diff:V.diff,sol,puz,limit:V.limit,jam:V.jam||false});
-    beginMatch(V.diff,sol,puz,V.limit,V.jam);
+    vsSend({t:'start',diff:V.diff,sol,puz,limit:V.limit,jam:V.jam||false,emo:V.emo});
+    beginMatch(V.diff,sol,puz,V.limit,V.jam,V.emo);
   },30);
 }
 function needV(){return V.jam?4:V.limit>0?2:0}
@@ -1040,7 +1065,7 @@ function vsHost(){
   const open=()=>{
     const c=String(Math.floor(Math.random()*90000)+10000);
     const peer=new Peer(PREFIX+c);
-    V={role:'host',peer,conn:null,phase:'waiting',code:c,diff:vsDiff,limit:CFG.vsLimitMin*60,jam:CFG.vsJam?Object.assign({},CFG.jam):null,oppFilled:0,total:0,result:null};
+    V={role:'host',peer,conn:null,phase:'waiting',code:c,diff:vsDiff,limit:CFG.vsLimitMin*60,jam:CFG.vsJam?Object.assign({},CFG.jam):null,emo:{size:CFG.emoSize,rand:CFG.emoRand},oppFilled:0,total:0,result:null};
     vsStatus('建立房間中…');
     peer.on('open',()=>{if(V&&V.peer===peer){V.ready=true;vsStatus('房間代碼：'+c+'　等待對手加入…');renderVS()}});
     peer.on('connection',conn=>{
