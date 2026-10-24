@@ -13,17 +13,17 @@
 <script src="peerjs.min.js"></script>
 <script src="qrcode.js"></script>
 <style>
-:root{--bscale:1;--dscale:.6;--padh:64px;--bg:#ffffff;--fg:#111111;--line:#888888;--strong:#111111;--cellbg:#ffffff;--given:#111111;--user:#1d4ed8;--hinted:#0a7a3d;--errbg:#ffd6d6;--errfg:#c00000;--okbg:#c8f0d2;--rel:#eef3fb;--same:#bcd6ff;--sel:#ffd966;--muted:#444444;--btnbg:#ffffff;--btnfg:#111111;--onbg:#111111;--onfg:#ffffff;--opp:#c2410c;--press:#ffd966;--overlay:rgba(255,255,255,.96);--b:calc(min(92vw,60vh)*var(--bscale))}
+:root{--bscale:1;--dscale:.6;--padh:64px;--bg:#ffffff;--fg:#111111;--line:#888888;--strong:#111111;--cellbg:#ffffff;--given:#111111;--user:#1d4ed8;--hinted:#0a7a3d;--errbg:#ffd6d6;--errfg:#c00000;--okbg:#c8f0d2;--rel:#eef3fb;--same:#bcd6ff;--sel:#ffd966;--muted:#444444;--btnbg:#ffffff;--btnfg:#111111;--onbg:#111111;--onfg:#ffffff;--opp:#c2410c;--press:#ffd966;--overlay:rgba(255,255,255,.96);--bw:calc(min(92vw,60vh)*var(--bscale));--b:min(var(--bw),var(--bfit,9999px))}
 html{background:var(--bg)}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,"PingFang TC",sans-serif;-webkit-user-select:none;user-select:none;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
-#app{display:flex;flex-direction:column;align-items:center;gap:14px;padding:12px;min-height:100vh}
+#app{display:flex;flex-direction:column;align-items:center;gap:14px;padding:max(12px,env(safe-area-inset-top)) 12px max(12px,env(safe-area-inset-bottom));min-height:100vh;box-sizing:border-box}
 @media (orientation:landscape){
-  :root{--b:calc(min(86vh,50vw)*var(--bscale))}
+  :root{--bw:calc(min(86vh,50vw)*var(--bscale));--b:var(--bw)}
   #app{flex-direction:row;justify-content:center;align-items:center;gap:28px}
   body.bs-right #app{flex-direction:row-reverse}
 }
-#panel{display:flex;flex-direction:column;gap:12px;width:var(--b)}
+#panel{display:flex;flex-direction:column;gap:12px;width:var(--bw)}
 @media (orientation:landscape){#panel{width:min(42vw,440px)}}
 h1{margin:0;font-size:26px;font-weight:800}
 .row{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
@@ -36,8 +36,8 @@ button{font-family:inherit}
 .btn:disabled{opacity:.35}
 .btn:active{transform:scale(.97)}
 .info{font-size:20px;font-weight:700}
-#board{width:var(--b);height:var(--b);display:grid;grid-template-columns:repeat(9,1fr);border:3px solid var(--strong)}
-.cell{position:relative;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:calc(var(--b)/9*var(--dscale));font-weight:700;background:var(--cellbg)}
+#board{width:var(--b);height:var(--b);display:grid;grid-template-columns:repeat(9,minmax(0,1fr));grid-template-rows:repeat(9,minmax(0,1fr));border:3px solid var(--strong)}
+.cell{min-width:0;min-height:0;overflow:hidden;position:relative;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:calc(var(--b)/9*var(--dscale));font-weight:700;background:var(--cellbg)}
 .cell.cr{border-right:3px solid var(--strong)}
 .cell.cb{border-bottom:3px solid var(--strong)}
 .cell.given{color:var(--given);font-weight:800}
@@ -315,6 +315,19 @@ function showOverlay(txt,sub,again,leave,view){
   $('#win').style.display='flex';
   renderResultBtn();
 }
+// 直向時讓「棋盤＋下方面板」剛好放進看得到的畫面（扣掉 Safari 工具列），放不下就縮小棋盤；
+// 面板寬度用未縮小的 --bw，縮棋盤不會讓按鈕換行，量一次就準
+function fitBoard(){
+  const r=document.documentElement.style,vh=window.visualViewport?visualViewport.height:innerHeight;
+  if(innerWidth>=innerHeight){r.removeProperty('--bfit');return}
+  if(lobby&&!(V&&V.phase==='playing'))return;// 大廳本來就要捲動，不為它縮棋盤
+  const app=$('#app'),cs=getComputedStyle(app),wrap=$('#boardWrap').getBoundingClientRect(),pn=$('#pad').getBoundingClientRect();// 量到數字面板為止，下方的提示文字可以超出
+  const over=parseFloat(cs.paddingTop)+parseFloat(cs.paddingBottom)+(pn.bottom-wrap.top)-board.getBoundingClientRect().height;
+  const fit=Math.max(240,Math.floor(vh-over-2));
+  if(r.getPropertyValue('--bfit')!==fit+'px')r.setProperty('--bfit',fit+'px');
+}
+addEventListener('resize',()=>fitBoard());
+if(window.visualViewport)visualViewport.addEventListener('resize',()=>fitBoard());
 function renderResultBtn(){
   $('#resultBtn').style.display=(S&&S.done&&S.reveal&&lastOverlay)?'block':'none';
 }
@@ -502,6 +515,7 @@ function render(){
   renderTimer();
   renderResultBtn();
   renderVS();
+  fitBoard();
 }
 
 // ---- settings (主題 / 大小 / 顏色 / 輔助顯示 / 版面)
@@ -514,8 +528,8 @@ const THEMES={
   contrast:{bg:'#ffffff',fg:'#000000',line:'#000000',strong:'#000000',cellbg:'#ffffff',given:'#000000',user:'#0000ee',hinted:'#006400',errbg:'#ffff00',errfg:'#d00000',okbg:'#9cf09c',rel:'#e6e6e6',same:'#9ec5ff',sel:'#ffb000',muted:'#000000',btnbg:'#ffffff',btnfg:'#000000',onbg:'#000000',onfg:'#ffffff',opp:'#b00000',press:'#ffb000',overlay:'rgba(255,255,255,1)'}
 };
 // 落後干擾的可調範圍：[最小, 最大, 每次加減]。差距最少 5 格、次數最多 5 次（使用者指定），其餘上下限是我定的
-const JLIM={gap:[5,30,1],max:[1,5,1],pause:[5,20,5],cover:[10,40,5],shuffle:[10,40,5],nonotes:[10,40,5]};
-const JAM_DEF={gap:10,max:2,pause:10,cover:20,shuffle:20,nonotes:20};
+const JLIM={gap:[5,30,1],max:[1,5,1],shields:[0,5,1],hold:[1,5,1],pause:[5,20,5],cover:[10,40,5],shuffle:[10,40,5],nonotes:[10,40,5]};
+const JAM_DEF={gap:10,max:2,shields:3,hold:1,pause:10,cover:20,shuffle:20,nonotes:20};
 function defCfg(){return {theme:'white',custom:{},bscale:100,dscale:60,padh:64,hlRel:true,hlSame:true,showLeft:true,boardSide:'left',padPos:'down',limitMin:0,vsLimitMin:0,vsJam:false,jam:Object.assign({},JAM_DEF),hints:Object.assign({},HINTS)}}
 function clamp(v,a,b,d){v=Number(v);return Number.isFinite(v)?Math.min(b,Math.max(a,Math.round(v))):d}
 function loadCfg(){
@@ -630,7 +644,7 @@ mkLimit($('#limitHost'),'limitMin');
 mkLimit($('#vsLimitHost'),'vsLimitMin');
 $('#setJam').onchange=e=>{CFG.vsJam=e.target.checked;cfgChanged()};
 {
-  const JLAB={gap:['落後幾格可發動',' 格'],max:['每局可用次數',' 次'],pause:['暫停',' 秒'],cover:['遮住九宮格',' 秒'],shuffle:['數字面板打亂',' 秒'],nonotes:['筆記與高亮關閉',' 秒']};
+  const JLAB={gap:['落後幾格可發動',' 格'],max:['每局可用次數',' 次'],shields:['每局最多得幾面護盾',' 面'],hold:['護盾同時最多持有',' 面'],pause:['暫停',' 秒'],cover:['遮住九宮格',' 秒'],shuffle:['數字面板打亂',' 秒'],nonotes:['筆記與高亮關閉',' 秒']};
   for(const k in JLIM){
     const row=document.createElement('div');row.className='stepper';
     row.innerHTML='<span class="lab wide">'+JLAB[k][0]+'</span><button type="button" data-d="-1">－</button><span class="val wide" id="jv_'+k+'"></span><button type="button" data-d="1">＋</button>';
@@ -694,7 +708,7 @@ function gotJam(m){
   if(!okJam(m))return;
   V.jamGot++;V.jamGotLast=Date.now();
   if(S.shield){
-    S.shield=0;V.stat.shielded++;vsSend({t:'block'});
+    S.shield--;V.stat.shielded++;vsSend({t:'block'});
     flash('護盾擋下了對手的干擾：'+JAMS[m.k].t);return;
   }
   V.stat.got++;V.stat.gotSec+=V.jam[m.k];
@@ -723,7 +737,10 @@ function vsUnits(){
     if(S.unitsDone[key]||U.c.every(x=>S.given[x])||!U.c.every(x=>S.vals[x]===S.sol[x]))continue;
     S.unitsDone[key]=true;
     vsSend({t:'done',u:U.u,i:U.i});
-    if(U.u==='b'&&V.jam&&!S.shield){S.shield=1;flash('得到護盾：可擋下一次干擾')}
+    // 護盾：每局可得上限（0＝關閉）與同時持有上限都由房主設定；持有已滿時不消耗可得次數
+    if(U.u==='b'&&V.jam&&(S.shieldGot||0)<V.jam.shields&&(S.shield||0)<V.jam.hold){
+      S.shield=(S.shield||0)+1;S.shieldGot=(S.shieldGot||0)+1;flash('得到護盾：可擋下一次干擾（持有 '+S.shield+' 面）');
+    }
   }
 }
 function flash(t){
@@ -847,7 +864,7 @@ function renderVS(){
     rule.textContent=rt;rule.classList.toggle('jam',jam);
     jb.style.display=js?'':'none';
     if(js){jb.textContent=js.t;jb.disabled=!js.ok}
-    $('#meShield').textContent=V.jam&&S.shield&&!S.done?'🛡️ 護盾':'';
+    $('#meShield').textContent=V.jam&&S.shield&&!S.done?'🛡️ 護盾'+(S.shield>1?' ×'+S.shield:''):'';
     renderPick();
   }
 }
@@ -889,7 +906,7 @@ function wire(conn){
 function onMsg(m){
   if(!V||!m||typeof m!=='object')return;
   if(m.t==='hi'&&V.role==='host'){
-    if((m.v===2||m.v===3)&&!V.oppV){
+    if((m.v===2||m.v===3||m.v===4)&&!V.oppV){
       V.oppV=m.v;
       if(V.hiTimer){
         clearTimeout(V.hiTimer);V.hiTimer=null;
@@ -945,7 +962,7 @@ function startMatch(){
     beginMatch(V.diff,sol,puz,V.limit,V.jam);
   },30);
 }
-function needV(){return V.jam?3:V.limit>0?2:0}
+function needV(){return V.jam?4:V.limit>0?2:0}
 function refuseOld(conn){
   V.conn=null;try{conn.close()}catch(e){}
   vsStatus('對手的頁面是舊版，無法進行'+(V.jam?'有落後干擾的':'限時')+'對戰。請對手把頁面重新開啟兩次更新後再加入');
@@ -995,7 +1012,7 @@ function vsJoin(){
     V.conn=conn;wire(conn);
     conn.on('open',()=>{
       if(V&&V.conn===conn&&V.phase==='joining')vsStatus('已連線，等待房主開始…');
-      try{conn.send({t:'hi',v:3})}catch(e){}
+      try{conn.send({t:'hi',v:4})}catch(e){}
     });
     setTimeout(()=>{if(V&&V.conn===conn&&V.phase==='joining'&&!conn.open)vsStatus('連線逾時，請確認代碼與網路')},10000);
   });
