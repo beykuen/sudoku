@@ -62,6 +62,13 @@ button{font-family:inherit}
 #win{position:fixed;inset:0;background:var(--overlay);display:none;flex-direction:column;align-items:center;justify-content:center;gap:18px;font-size:30px;font-weight:800;z-index:9}
 #win .btn{flex:none;padding:12px 28px;font-size:22px}
 #winSub{font-size:20px;font-weight:700;color:var(--muted);white-space:pre-line;text-align:center}
+.cell.cov{background:var(--strong);color:transparent}
+#pad.jammed button{opacity:.3}
+#vsRule.jam{color:var(--errfg);font-weight:800}
+.shield{font-weight:800;color:var(--hinted);white-space:nowrap}
+#emoFly{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);font-size:110px;line-height:1;pointer-events:none;display:none;z-index:5}
+#vsPick{display:none;gap:8px;flex-wrap:nowrap}
+#vsPick button{min-height:44px;padding:4px 6px;font-size:18px}
 .vs{display:flex;flex-direction:column;gap:10px;border:2px solid var(--strong);border-radius:12px;padding:12px}
 .vs .seg{align-self:flex-start}
 .vs input{flex:1;min-width:0;font-size:22px;font-weight:800;border:2px solid var(--strong);border-radius:10px;padding:8px;text-align:center;-webkit-user-select:text;user-select:text;background:var(--cellbg);color:var(--fg)}
@@ -70,7 +77,7 @@ button{font-family:inherit}
 .bar i{display:block;height:100%;width:0;background:var(--fg);transition:width .25s}
 .qr{align-self:center;width:min(240px,100%);padding:12px;border-radius:12px;background:#fff}
 .qr svg{display:block;width:100%;height:auto}
-#boardWrap{display:flex;flex-direction:column;gap:8px}
+#boardWrap{display:flex;flex-direction:column;gap:8px;position:relative}
 #vsBar{display:none;flex-direction:column;gap:6px;width:var(--b)}
 .vsline{display:flex;align-items:center;gap:8px;font-size:18px;font-weight:800}
 .vsline .who{min-width:44px}
@@ -87,6 +94,8 @@ button{font-family:inherit}
 .stepper{display:flex;align-items:center;gap:10px;margin:6px 0}
 .stepper .lab{min-width:56px;font-size:20px;font-weight:800}
 .stepper button{width:60px;height:46px;border:2px solid var(--strong);background:var(--btnbg);color:var(--btnfg);border-radius:10px;font-size:26px;font-weight:800;padding:0}
+.stepper .lab.wide{min-width:170px;font-size:19px}
+.stepper .val.wide{min-width:80px}
 .stepper .val{min-width:36px;text-align:center;font-size:24px;font-weight:800}
 body.pad-up #pad{order:1}
 body.pad-up #rowAct{order:2}
@@ -112,9 +121,10 @@ body.pad-up #toast{order:3}
   <div id="boardWrap">
     <div id="vsBar">
       <div class="vsline"><span class="who">對手</span><div class="bar"><i id="oppBar" style="background:var(--opp)"></i></div><span class="num" id="oppNum">0/0</span><span class="conn on" id="vsConn">● 已連線</span></div>
-      <div class="vsline"><span class="who">你</span><div class="bar"><i id="meBar"></i></div><span class="num" id="meNum">0/0</span></div>
+      <div class="vsline"><span class="who">你</span><div class="bar"><i id="meBar"></i></div><span class="num" id="meNum">0/0</span><span class="shield" id="meShield"></span></div>
     </div>
     <div id="board"></div>
+    <div id="emoFly"></div>
   </div>
   <div id="panel">
     <div class="row"><h1>數獨</h1><div class="row" style="gap:10px;flex-wrap:nowrap"><div class="info" id="timer">00:00</div><button class="btn" id="setBtn" style="flex:none;min-height:44px;padding:6px 14px">設定</button></div></div>
@@ -134,7 +144,7 @@ body.pad-up #toast{order:3}
     <button class="btn" id="vsToggle" style="flex:none;min-height:48px">雙人對戰</button>
     <div class="vs" id="vsLobby" style="display:none">
       <div class="seg" id="vsDiffSeg"><button data-d="easy" class="on">簡單</button><button data-d="medium">中等</button><button data-d="hard">困難</button></div>
-      <div class="info">對戰時間（建立房間時套用）</div><div id="vsLimitHost"></div>
+      <div class="info">對戰時間（建立房間時套用）<span id="vsJamNote"></span></div><div id="vsLimitHost"></div>
       <div class="row"><button class="btn" id="vsHost" style="min-height:48px">建立房間</button><button class="btn" id="vsCancel" style="min-height:48px">取消</button></div>
       <div class="row"><input id="vsCode" inputmode="numeric" maxlength="5" placeholder="房間代碼"><button class="btn" id="vsJoin" style="min-height:48px">加入房間</button></div>
       <div class="row" id="vsShareRow" style="display:none"><button class="btn" id="vsShare" style="min-height:48px">分享連結</button><button class="btn" id="vsQr" style="min-height:48px">顯示 QR</button></div>
@@ -143,7 +153,8 @@ body.pad-up #toast{order:3}
     </div>
     <div class="vs" id="vsGame" style="display:none">
       <div class="info" id="vsRule">對戰中：先完整填對的人獲勝</div>
-      <button class="btn" id="vsLeaveBtn" style="min-height:44px;flex:none">離開對戰</button>
+      <div class="row" id="vsBtns" style="flex-wrap:nowrap"><button class="btn" id="vsJamBtn" style="min-height:44px;display:none">干擾對手</button><button class="btn" id="vsEmoBtn" style="min-height:44px;flex:none;padding:6px 14px">😀</button><button class="btn" id="vsLeaveBtn" style="min-height:44px">離開對戰</button></div>
+      <div class="row" id="vsPick"></div>
     </div>
     <div class="row" id="rowAct">
       <button class="btn" id="undoBtn">復原</button>
@@ -178,6 +189,9 @@ body.pad-up #toast{order:3}
   <label class="chk"><input type="checkbox" id="setLeft">顯示數字剩餘數量</label>
   <h3>提示次數（下一局生效）</h3>
   <div id="setHints"></div>
+  <h3>落後干擾（對戰，房主建立房間時套用）</h3>
+  <label class="chk"><input type="checkbox" id="setJam">開啟落後干擾</label>
+  <div id="setJamOpts"></div>
   <h3>版面</h3>
   <div class="row"><span class="info">橫向時棋盤</span><div class="seg" id="setSide"><button data-v="left">在左</button><button data-v="right">在右</button></div></div>
   <div class="row" style="margin-top:8px"><span class="info">數字面板</span><div class="seg" id="setPad"><button data-v="down">在按鈕下</button><button data-v="up">在按鈕上</button></div></div>
@@ -268,7 +282,7 @@ function toast(t){$('#toast').textContent=t}
 function errors(){const e=[];for(let i=0;i<81;i++)if(S.vals[i]&&S.vals[i]!==S.sol[i])e.push(i);return e}
 
 function place(d){
-  if(sel<0||locked(sel)||S.done)return;
+  if(sel<0||locked(sel)||S.done||jamOn('pause')||covered(sel))return;
   if(noteMode){
     if(S.vals[sel])return;
     snap();S.notes[sel]^=(1<<d);
@@ -284,6 +298,7 @@ function place(d){
   afterChange();
 }
 function afterChange(){
+  if(V&&V.phase==='playing')vsUnits();
   save();render();
   if(S.vals.every(v=>v)){
     const e=errors();
@@ -304,7 +319,7 @@ function renderResultBtn(){
   $('#resultBtn').style.display=(S&&S.done&&S.reveal&&lastOverlay)?'block':'none';
 }
 // 對戰結束（不論輸贏）：公布答案並標示自己填對（綠底）與填錯（紅底）的格子
-function vsMark(){S.reveal=true;S.mark=true;sel=-1;showErr=false;render();return statTxt(stats(S.vals))}
+function vsMark(){S.jam=null;S.reveal=true;S.mark=true;sel=-1;showErr=false;render();return statTxt(stats(S.vals))}
 function win(){
   S.done=true;
   if(V&&V.phase==='playing'){
@@ -317,11 +332,11 @@ function win(){
   showSoloEnd();
 }
 function erase(){
-  if(sel<0||locked(sel)||S.done)return;
+  if(sel<0||locked(sel)||S.done||jamOn('pause')||covered(sel))return;
   snap();S.vals[sel]=0;S.notes[sel]=0;showErr=false;afterChange();
 }
 function undo(){
-  if(!hist.length||S.done)return;
+  if(!hist.length||S.done||jamOn('pause'))return;
   const h=hist.pop();
   for(let i=0;i<81;i++)if(!locked(i)){S.vals[i]=h.v[i];S.notes[i]=h.n[i]}
   showErr=false;toast('');save();render();
@@ -366,6 +381,7 @@ function renderTimer(){
 }
 function timerTick(){
   if(!S||S.done)return;
+  if(V&&V.phase==='playing'&&V.jam)jamTick();
   if(S.limit){
     const rem=Math.ceil((S.deadline-Date.now())/1000);
     if(rem<=0){timeUp();return}
@@ -381,7 +397,7 @@ function timeUp(){
   if(V&&V.phase==='playing'){
     // 對戰：把自己的盤面交給對手，雙方各自用同一份答案驗證，結果才會一致
     vsSend({t:'final',vals:S.vals.slice()});
-    S.mark=true;render();vsResolve();
+    S.mark=true;S.jam=null;render();vsResolve();
     return;
   }
   save();render();showSoloEnd();
@@ -430,7 +446,7 @@ for(let i=0;i<81;i++){
   const r=Math.floor(i/9),c=i%9;
   if(c===2||c===5)d.classList.add('cr');
   if(r===2||r===5)d.classList.add('cb');
-  d.addEventListener('pointerdown',e=>{e.preventDefault();sel=i;render()});
+  d.addEventListener('pointerdown',e=>{e.preventDefault();if(covered(i))return;sel=i;render()});
   board.appendChild(d);cells.push(d);
 }
 const pad=$('#pad');
@@ -444,25 +460,26 @@ function render(){
   if(!S)return;
   const sv=sel>=0?S.vals[sel]:0;
   const errSet=new Set();
-  const rv=!!S.reveal;
+  const rv=!!S.reveal,nn=jamOn('nonotes'),hlS=CFG.hlSame&&!nn,hlR=CFG.hlRel&&!nn;
   if(S.mode==='instant'||showErr||rv)errors().forEach(i=>errSet.add(i));
   for(let i=0;i<81;i++){
     const el=cells[i],v=S.vals[i],miss=rv&&!S.given[i]&&v!==S.sol[i],dv=miss?S.sol[i]:v;
     let cls='cell'+(el.classList.contains('cr')?' cr':'')+(el.classList.contains('cb')?' cb':'');
+    if(covered(i)){el.className=cls+' cov';el.textContent='';continue}
     if(S.given[i])cls+=' given';else if(S.hinted[i])cls+=' hinted';else if(v)cls+=' user';
     if(sel>=0){
       if(i===sel)cls+=' sel';
-      else if(CFG.hlSame&&sv&&v===sv)cls+=' same';
-      else if(CFG.hlRel&&PEERS[sel].includes(i))cls+=' rel';
+      else if(hlS&&sv&&v===sv)cls+=' same';
+      else if(hlR&&PEERS[sel].includes(i))cls+=' rel';
     }
     if(rv&&S.mark&&!S.given[i]&&v&&v===S.sol[i])cls+=' ok';
     if(errSet.has(i))cls+=' err';
     if(miss)cls+=' ans';
     el.className=cls;
     if(dv)el.textContent=dv;
-    else if(S.notes[i]){
+    else if(S.notes[i]&&!nn){
       let h='<div class="notes">';
-      for(let d=1;d<=9;d++)h+='<span'+(CFG.hlSame&&sv===d?' class="hl"':'')+'>'+((S.notes[i]&(1<<d))?d:'')+'</span>';
+      for(let d=1;d<=9;d++)h+='<span'+(hlS&&sv===d?' class="hl"':'')+'>'+((S.notes[i]&(1<<d))?d:'')+'</span>';
       el.innerHTML=h+'</div>';
     }else el.textContent='';
   }
@@ -471,7 +488,9 @@ function render(){
     const d=+b.dataset.d,left=9-cnt[d];
     b.innerHTML=d+'<small>'+(CFG.showLeft&&left>0?left:'')+'</small>';
     b.classList.toggle('done',left<=0);
+    b.style.order=jamOn('shuffle')?S.jam.perm.indexOf(d):'';
   });
+  pad.classList.toggle('jammed',jamOn('pause'));
   pad.classList.toggle('note',noteMode);
   document.querySelectorAll('#diff button').forEach(b=>b.classList.toggle('on',b.dataset.d===S.diff));
   document.querySelectorAll('#mode button').forEach(b=>b.classList.toggle('on',b.dataset.m===S.mode));
@@ -494,7 +513,10 @@ const THEMES={
   cream:{bg:'#f6efdc',fg:'#3b2f1e',line:'#b8a98a',strong:'#3b2f1e',cellbg:'#fbf6e8',given:'#2b2114',user:'#1e4fa3',hinted:'#1f6b3a',errbg:'#f4c7b8',errfg:'#a1260f',okbg:'#cfe3b5',rel:'#efe4c6',same:'#d9c690',sel:'#f2c45a',muted:'#6b5a3e',btnbg:'#fbf6e8',btnfg:'#3b2f1e',onbg:'#3b2f1e',onfg:'#fbf6e8',opp:'#b4501a',press:'#f2c45a',overlay:'rgba(246,239,220,.96)'},
   contrast:{bg:'#ffffff',fg:'#000000',line:'#000000',strong:'#000000',cellbg:'#ffffff',given:'#000000',user:'#0000ee',hinted:'#006400',errbg:'#ffff00',errfg:'#d00000',okbg:'#9cf09c',rel:'#e6e6e6',same:'#9ec5ff',sel:'#ffb000',muted:'#000000',btnbg:'#ffffff',btnfg:'#000000',onbg:'#000000',onfg:'#ffffff',opp:'#b00000',press:'#ffb000',overlay:'rgba(255,255,255,1)'}
 };
-function defCfg(){return {theme:'white',custom:{},bscale:100,dscale:60,padh:64,hlRel:true,hlSame:true,showLeft:true,boardSide:'left',padPos:'down',limitMin:0,vsLimitMin:0,hints:Object.assign({},HINTS)}}
+// 落後干擾的可調範圍：[最小, 最大, 每次加減]。差距最少 5 格、次數最多 5 次（使用者指定），其餘上下限是我定的
+const JLIM={gap:[5,30,1],max:[1,5,1],pause:[5,20,5],cover:[10,40,5],shuffle:[10,40,5],nonotes:[10,40,5]};
+const JAM_DEF={gap:10,max:2,pause:10,cover:20,shuffle:20,nonotes:20};
+function defCfg(){return {theme:'white',custom:{},bscale:100,dscale:60,padh:64,hlRel:true,hlSame:true,showLeft:true,boardSide:'left',padPos:'down',limitMin:0,vsLimitMin:0,vsJam:false,jam:Object.assign({},JAM_DEF),hints:Object.assign({},HINTS)}}
 function clamp(v,a,b,d){v=Number(v);return Number.isFinite(v)?Math.min(b,Math.max(a,Math.round(v))):d}
 function loadCfg(){
   // 儲存的資料也不盲信：逐項驗證
@@ -510,6 +532,8 @@ function loadCfg(){
       if(s.padPos==='up')c.padPos='up';
       const lim=v=>Number.isInteger(v)&&v>=0&&v<=120?v:0;
       c.limitMin=lim(s.limitMin);c.vsLimitMin=lim(s.vsLimitMin);
+      if(typeof s.vsJam==='boolean')c.vsJam=s.vsJam;
+      if(s.jam&&typeof s.jam==='object')for(const k in JLIM){const v=s.jam[k],[lo,hi]=JLIM[k];if(Number.isInteger(v)&&v>=lo&&v<=hi)c.jam[k]=v}
       if(s.hints&&typeof s.hints==='object')for(const k of Object.keys(HINTS)){const n=s.hints[k];if(Number.isInteger(n)&&n>=0&&n<=9)c.hints[k]=n}
     }
   }catch(e){}
@@ -604,7 +628,175 @@ function mkLimit(host,key){
 }
 mkLimit($('#limitHost'),'limitMin');
 mkLimit($('#vsLimitHost'),'vsLimitMin');
+$('#setJam').onchange=e=>{CFG.vsJam=e.target.checked;cfgChanged()};
+{
+  const JLAB={gap:['落後幾格可發動',' 格'],max:['每局可用次數',' 次'],pause:['暫停',' 秒'],cover:['遮住九宮格',' 秒'],shuffle:['數字面板打亂',' 秒'],nonotes:['筆記與高亮關閉',' 秒']};
+  for(const k in JLIM){
+    const row=document.createElement('div');row.className='stepper';
+    row.innerHTML='<span class="lab wide">'+JLAB[k][0]+'</span><button type="button" data-d="-1">－</button><span class="val wide" id="jv_'+k+'"></span><button type="button" data-d="1">＋</button>';
+    $('#setJamOpts').appendChild(row);
+    row.querySelectorAll('button').forEach(b=>b.onclick=()=>{
+      const [lo,hi,st]=JLIM[k];
+      CFG.jam[k]=Math.min(hi,Math.max(lo,CFG.jam[k]+Number(b.dataset.d)*st));
+      cfgChanged();
+    });
+  }
+  limitSyncs.push(()=>{
+    $('#setJam').checked=CFG.vsJam;
+    $('#setJamOpts').style.display=CFG.vsJam?'':'none';
+    for(const k in JLIM)$('#jv_'+k).textContent=CFG.jam[k]+JLAB[k][1];
+    $('#vsJamNote').textContent=CFG.vsJam?'・干擾：開':'';
+  });
+  limitSyncs.forEach(f=>f());
+}
 applyCfg();
+
+// ---- 落後干擾：落後方從四種阻礙隨機抽一種丟給領先方
+const JAMS={pause:{t:'暫停'},cover:{t:'遮住一個九宮格'},shuffle:{t:'數字面板打亂'},nonotes:{t:'筆記與高亮關閉'}};
+const JAM_CD=60000;
+function okJamCfg(j){return !!j&&typeof j==='object'&&Object.keys(JLIM).every(k=>{const v=j[k];return Number.isInteger(v)&&v>=JLIM[k][0]&&v<=JLIM[k][1]})}
+function jamOn(k){return !!(S&&S.jam&&S.jam.k===k&&Date.now()<S.jam.until)}
+function blockOf(i){return Math.floor(Math.floor(i/9)/3)*3+Math.floor(i%9/3)}
+function covered(i){return jamOn('cover')&&blockOf(i)===S.jam.b}
+function myFilled(){let n=0;for(let i=0;i<81;i++)if(!S.given[i]&&S.vals[i])n++;return n}
+function jamState(){
+  // 回傳按鈕狀態：ok=可發動，否則附上原因
+  if(!(V&&V.phase==='playing'&&V.jam&&!S.done))return null;
+  if(V.jamUsed>=V.jam.max)return {ok:false,t:'干擾次數已用完'};
+  const cd=Math.ceil((JAM_CD-(Date.now()-V.jamLast))/1000);
+  if(V.jamLast&&cd>0)return {ok:false,t:cd+' 秒後可再干擾'};
+  if(V.oppFilled-myFilled()<V.jam.gap)return {ok:false,t:'落後 '+V.jam.gap+' 格可干擾'};
+  if(!(V.conn&&V.conn.open))return {ok:false,t:'對手離線'};
+  return {ok:true,t:'干擾對手（剩 '+(V.jam.max-V.jamUsed)+' 次）'};
+}
+function doJam(k){
+  const st=jamState();if(!st||!st.ok||!JAMS.hasOwnProperty(k))return;
+  const m={t:'jam',k};
+  if(k==='cover')m.b=Math.floor(Math.random()*9);
+  if(k==='shuffle'){
+    const p=[1,2,3,4,5,6,7,8,9];for(let i=8;i>0;i--){const j=Math.floor(Math.random()*(i+1));[p[i],p[j]]=[p[j],p[i]]}
+    if(p.every((d,i)=>d===i+1))p.push(p.shift());// 剛好沒打亂時改成整排位移，保證一定有變化
+    m.perm=p;
+  }
+  vsSend(m);
+  V.jamUsed++;V.jamLast=Date.now();V.jamSent={k,until:Date.now()+V.jam[k]*1000};V.stat.sent++;
+  render();
+}
+function okJam(m){
+  // 對方傳來的干擾不可信：依房間設定驗證種類、參數、次數、間隔與落後差距（差距留 3 格誤差給進度延遲）
+  if(!(V&&V.phase==='playing'&&V.jam&&!S.done)||!JAMS.hasOwnProperty(m.k))return false;
+  if(m.k==='cover'&&!(Number.isInteger(m.b)&&m.b>=0&&m.b<=8))return false;
+  if(m.k==='shuffle'&&!(Array.isArray(m.perm)&&m.perm.length===9&&[1,2,3,4,5,6,7,8,9].every(d=>m.perm.includes(d))))return false;
+  if(V.jamGot>=V.jam.max||(V.jamGotLast&&Date.now()-V.jamGotLast<JAM_CD-5000))return false;
+  return myFilled()-V.oppFilled>=Math.max(1,V.jam.gap-3);
+}
+function gotJam(m){
+  if(!okJam(m))return;
+  V.jamGot++;V.jamGotLast=Date.now();
+  if(S.shield){
+    S.shield=0;V.stat.shielded++;vsSend({t:'block'});
+    flash('護盾擋下了對手的干擾：'+JAMS[m.k].t);return;
+  }
+  V.stat.got++;V.stat.gotSec+=V.jam[m.k];
+  S.jam={k:m.k,until:Date.now()+V.jam[m.k]*1000};
+  if(m.k==='cover'){S.jam.b=m.b;if(sel>=0&&blockOf(sel)===m.b)sel=-1}
+  if(m.k==='shuffle')S.jam.perm=m.perm.slice();
+  render();
+}
+// ---- 對戰的趣味機制
+// 護盾：干擾房間裡，完整填對一個九宮格得到一面護盾（最多持有 1 面），自動擋下下一次干擾
+// 兩選一＋自救：按「干擾對手」後從兩種隨機干擾裡挑一種，或改成自救（補一格正確答案），都算用掉一次
+// 完成播報：填對一整列 / 行 / 九宮格時通知對手；快速表情：送表情給對手（所有對戰都有）
+const EMOS=['👍','😂','😱','😤','🔥'],JSHORT={pause:'暫停',cover:'遮格',shuffle:'打亂',nonotes:'關筆記'};
+let FLASH_MS=3000,EMO_MS=2000,EMO_CD=3000;
+const UNITS=[];
+for(let r=0;r<9;r++)UNITS.push({u:'r',i:r,c:[...Array(9).keys()].map(c=>r*9+c)});
+for(let c=0;c<9;c++)UNITS.push({u:'c',i:c,c:[...Array(9).keys()].map(r=>r*9+c)});
+for(let b=0;b<9;b++)UNITS.push({u:'b',i:b,c:[...Array(81).keys()].filter(x=>blockOf(x)===b)});
+const UNAME={r:'列',c:'行',b:'九宮格'};
+function unitLabel(u,i){return '第 '+(i+1)+' '+UNAME[u]}
+function vsUnits(){
+  // 每個單位第一次全部填對時才算；全是題目數字的單位不算
+  if(!S.unitsDone)S.unitsDone={};
+  for(const U of UNITS){
+    const key=U.u+U.i;
+    if(S.unitsDone[key]||U.c.every(x=>S.given[x])||!U.c.every(x=>S.vals[x]===S.sol[x]))continue;
+    S.unitsDone[key]=true;
+    vsSend({t:'done',u:U.u,i:U.i});
+    if(U.u==='b'&&V.jam&&!S.shield){S.shield=1;flash('得到護盾：可擋下一次干擾')}
+  }
+}
+function flash(t){
+  V.flash={t,until:Date.now()+FLASH_MS};
+  clearTimeout(V.flashTimer);V.flashTimer=setTimeout(()=>{if(V){V.flash=null;renderVS()}},FLASH_MS);
+  renderVS();
+}
+function gotDone(m){
+  if(!(V&&V.phase==='playing')||!UNAME.hasOwnProperty(m.u)||!Number.isInteger(m.i)||m.i<0||m.i>8)return;
+  if(!V.oppUnits)V.oppUnits={};
+  if(V.oppUnits[m.u+m.i])return;
+  V.oppUnits[m.u+m.i]=true;
+  flash('對手完成了'+unitLabel(m.u,m.i));
+}
+function openPick(kind){
+  if(kind==='jam'){
+    const st=jamState();if(!st||!st.ok)return;
+    const ks=Object.keys(JAMS);
+    const a=ks.splice(Math.floor(Math.random()*ks.length),1)[0],b=ks[Math.floor(Math.random()*ks.length)];
+    V.pick={kind,opts:[a,b]};
+  }else V.pick={kind};
+  renderVS();
+}
+function renderPick(){
+  const box=$('#vsPick'),pk=V&&V.phase==='playing'&&!S.done?V.pick:null;
+  if(pk&&pk.kind==='jam'&&!(jamState()||{}).ok){V.pick=null;return renderPick()}
+  $('#vsBtns').style.display=pk?'none':'flex';
+  box.style.display=pk?'flex':'none';
+  const sig=pk?(pk.kind+(pk.opts||[]).join()):'';
+  if(box.dataset.sig===sig)return;
+  box.dataset.sig=sig;box.innerHTML='';
+  if(!pk)return;
+  const add=(t,f)=>{const b=document.createElement('button');b.className='btn';b.type='button';b.textContent=t;b.onclick=f;box.appendChild(b)};
+  if(pk.kind==='jam'){
+    pk.opts.forEach(k=>add(JSHORT[k],()=>{V.pick=null;doJam(k)}));
+    add('自救',()=>{V.pick=null;doAid()});
+  }else EMOS.forEach((e,i)=>add(e,()=>{V.pick=null;sendEmo(i)}));
+  add('取消',()=>{V.pick=null;renderVS()});
+}
+function doAid(){
+  // 自救：補一格正確答案（優先補選取的格子），和干擾共用次數與間隔
+  const st=jamState();if(!st||!st.ok)return;
+  let t=-1;
+  if(sel>=0&&!locked(sel)&&S.vals[sel]!==S.sol[sel]&&!covered(sel))t=sel;
+  else{const c=[];for(let i=0;i<81;i++)if(S.vals[i]!==S.sol[i]&&!covered(i))c.push(i);if(!c.length)return;t=c[Math.floor(Math.random()*c.length)]}
+  V.jamUsed++;V.jamLast=Date.now();V.stat.aid++;
+  const d=S.sol[t];
+  S.vals[t]=d;S.notes[t]=0;S.hinted[t]=true;
+  for(const p of PEERS[t])S.notes[p]&=~(1<<d);
+  sel=t;showErr=false;toast('');afterChange();
+}
+function sendEmo(i){
+  if(!(V&&V.phase==='playing')||Date.now()-(V.emoLast||0)<EMO_CD)return;
+  V.emoLast=Date.now();vsSend({t:'emo',e:i});flash('已送出 '+EMOS[i]);
+}
+function gotEmo(m){
+  if(!(V&&V.phase==='playing')||!Number.isInteger(m.e)||m.e<0||m.e>=EMOS.length)return;
+  if(Date.now()-(V.emoGot||0)<1000)return;
+  V.emoGot=Date.now();
+  const f=$('#emoFly');f.textContent=EMOS[m.e];f.style.display='block';
+  clearTimeout(V.emoTimer);V.emoTimer=setTimeout(()=>{f.style.display='none'},EMO_MS);
+}
+function jamRecord(){
+  if(!(V&&V.jam&&V.stat))return '';
+  const t=V.stat;
+  return '干擾紀錄：發動 '+t.sent+' 次（被擋 '+t.blocked+'）・自救 '+t.aid+' 次\n被干擾 '+t.got+' 次共 '+t.gotSec+' 秒・護盾擋下 '+t.shielded+' 次';
+}
+function jamTick(){
+  if(!V||V.phase!=='playing')return;
+  if(S.jam&&Date.now()>=S.jam.until)S.jam=null;
+  if(V.jamSent&&Date.now()>=V.jamSent.until)V.jamSent=null;
+  render();
+}
 
 // ---- versus (PeerJS, 房間代碼配對後兩台直連)
 const PREFIX='ktb-sdk-';
@@ -621,6 +813,7 @@ function validStart(m){
   if(!m||typeof m.diff!=='string'||!HINTS.hasOwnProperty(m.diff))return false;
   if(!okArr(m.puz,0)||!okArr(m.sol,1))return false;
   if(!Number.isInteger(m.limit)||m.limit<0||m.limit>7200)return false;
+  if(m.jam!==undefined&&m.jam!==false&&!okJamCfg(m.jam))return false;
   if(!m.puz.every((v,i)=>v===0||v===m.sol[i]))return false;
   return m.sol.every((v,i)=>PEERS[i].every(p=>m.sol[p]!==v));
 }
@@ -646,20 +839,30 @@ function renderVS(){
     const up=!!(V.conn&&V.conn.open),cn=$('#vsConn');
     cn.textContent=up?'● 已連線':'● 對手離線';
     cn.className='conn '+(up?'on':'off');
-    $('#vsRule').textContent=V.limit>0?'限時 '+Math.round(V.limit/60)+' 分鐘：時間到時正確格數多的人獲勝，提早全對者直接獲勝':'對戰中：先完整填對的人獲勝';
+    const rule=$('#vsRule'),now=Date.now(),js=jamState(),jb=$('#vsJamBtn');
+    let rt=V.limit>0?'限時 '+Math.round(V.limit/60)+' 分鐘：時間到時正確格數多的人獲勝，提早全對者直接獲勝':'對戰中：先完整填對的人獲勝',jam=false;
+    if(S.jam&&now<S.jam.until&&!S.done){rt='被對手干擾：'+JAMS[S.jam.k].t+'（剩 '+Math.ceil((S.jam.until-now)/1000)+' 秒）';jam=true}
+    else if(V.flash&&!S.done)rt=V.flash.t;
+    else if(V.jamSent&&now<V.jamSent.until&&!S.done)rt='已干擾對手：'+JAMS[V.jamSent.k].t+'（剩 '+Math.ceil((V.jamSent.until-now)/1000)+' 秒）';
+    rule.textContent=rt;rule.classList.toggle('jam',jam);
+    jb.style.display=js?'':'none';
+    if(js){jb.textContent=js.t;jb.disabled=!js.ok}
+    $('#meShield').textContent=V.jam&&S.shield&&!S.done?'🛡️ 護盾':'';
+    renderPick();
   }
 }
 function showResult(txt,sub,view){
   const open=!!(V&&V.conn&&V.conn.open),fin=!!(V&&V.result);
   const again=open&&fin&&V.role==='host';
   let s=sub||'';
+  const rec=jamRecord();if(rec&&fin)s+=(s?'\n':'')+rec;
   if(open&&fin&&V.role==='guest')s+=(s?'\n':'')+'等待房主開始下一局';
   showOverlay(txt,s,again,true,!!(view||S.reveal));
 }
 function vsLeave(msg){
   const v=V;V=null;
   if(v){
-    clearTimeout(v.finalTimer);clearTimeout(v.hiTimer);
+    clearTimeout(v.finalTimer);clearTimeout(v.hiTimer);clearTimeout(v.flashTimer);clearTimeout(v.emoTimer);$('#emoFly').style.display='none';
     try{if(v.conn)v.conn.close()}catch(e){}
     try{if(v.peer)v.peer.destroy()}catch(e){}
   }
@@ -686,16 +889,28 @@ function wire(conn){
 function onMsg(m){
   if(!V||!m||typeof m!=='object')return;
   if(m.t==='hi'&&V.role==='host'){
-    if(m.v===2&&!V.oppV){
-      V.oppV=2;
-      if(V.hiTimer){clearTimeout(V.hiTimer);V.hiTimer=null;startMatch()}
+    if((m.v===2||m.v===3)&&!V.oppV){
+      V.oppV=m.v;
+      if(V.hiTimer){
+        clearTimeout(V.hiTimer);V.hiTimer=null;
+        if(V.oppV>=needV())startMatch();else refuseOld(V.conn);
+      }
     }
   }else if(m.t==='start'&&V.role==='guest'){
-    if(validStart(m))beginMatch(m.diff,m.sol,m.puz,m.limit);else vsStatus('收到無效的題目資料');
+    if(validStart(m))beginMatch(m.diff,m.sol,m.puz,m.limit,m.jam||null);else vsStatus('收到無效的題目資料');
   }else if(m.t==='prog'&&V.phase==='playing'){
     if(Number.isInteger(m.n)&&m.n>=0&&m.n<=V.total){V.oppFilled=m.n;renderVS()}
   }else if(m.t==='win'&&V.phase==='playing'&&typeof m.sec==='number'){
     oppWin(m.sec);
+  }else if(m.t==='jam'){
+    gotJam(m);
+  }else if(m.t==='block'){
+    // 只有真的有一個干擾在作用中時才接受「被擋下」
+    if(V.phase==='playing'&&V.jamSent&&!V.jamSent.blocked){V.jamSent=null;V.stat.blocked++;flash('對手用護盾擋下了你的干擾')}
+  }else if(m.t==='done'){
+    gotDone(m);
+  }else if(m.t==='emo'){
+    gotEmo(m);
   }else if(m.t==='final'&&V.phase==='playing'&&okFinal(m.vals)){
     V.oppFinal=m.vals.slice();vsResolve();
   }
@@ -710,11 +925,14 @@ function oppWin(sec){
   V.result='lose';S.done=true;
   showResult('對手先完成了，你輸了',vsMark());
 }
-function beginMatch(diff,sol,puz,limit){
+function beginMatch(diff,sol,puz,limit,jam){
   if(!backup)backup=S;
   S=makeState(diff,sol,puz,true,limit);
   clearTimeout(V.finalTimer);
   V.phase='playing';V.oppFilled=0;V.result=null;V.limit=limit;V.oppFinal=null;
+  V.jam=jam?Object.fromEntries(Object.keys(JLIM).map(k=>[k,jam[k]])):null;V.jamUsed=0;V.jamLast=0;V.jamGot=0;V.jamGotLast=0;V.jamSent=null;
+  V.stat={sent:0,blocked:0,aid:0,got:0,gotSec:0,shielded:0};V.pick=null;V.flash=null;V.oppUnits={};V.emoLast=0;V.emoGot=0;
+  clearTimeout(V.flashTimer);clearTimeout(V.emoTimer);$('#emoFly').style.display='none';
   V.total=S.given.filter(g=>!g).length;
   sel=-1;hist=[];showErr=false;noteMode=false;lobby=false;
   $('#win').style.display='none';toast('');vsStatus('');render();
@@ -723,9 +941,15 @@ function startMatch(){
   setTimeout(()=>{
     if(!V||V.role!=='host'||!V.conn||!V.conn.open)return;
     const {sol,puz}=generate(V.diff);
-    vsSend({t:'start',diff:V.diff,sol,puz,limit:V.limit});
-    beginMatch(V.diff,sol,puz,V.limit);
+    vsSend({t:'start',diff:V.diff,sol,puz,limit:V.limit,jam:V.jam||false});
+    beginMatch(V.diff,sol,puz,V.limit,V.jam);
   },30);
+}
+function needV(){return V.jam?3:V.limit>0?2:0}
+function refuseOld(conn){
+  V.conn=null;try{conn.close()}catch(e){}
+  vsStatus('對手的頁面是舊版，無法進行'+(V.jam?'有落後干擾的':'限時')+'對戰。請對手把頁面重新開啟兩次更新後再加入');
+  renderVS();
 }
 function vsHost(){
   if(typeof Peer==='undefined'){vsStatus('無法載入連線元件，請確認已連網');return}
@@ -734,7 +958,7 @@ function vsHost(){
   const open=()=>{
     const c=String(Math.floor(Math.random()*90000)+10000);
     const peer=new Peer(PREFIX+c);
-    V={role:'host',peer,conn:null,phase:'waiting',code:c,diff:vsDiff,limit:CFG.vsLimitMin*60,oppFilled:0,total:0,result:null};
+    V={role:'host',peer,conn:null,phase:'waiting',code:c,diff:vsDiff,limit:CFG.vsLimitMin*60,jam:CFG.vsJam?Object.assign({},CFG.jam):null,oppFilled:0,total:0,result:null};
     vsStatus('建立房間中…');
     peer.on('open',()=>{if(V&&V.peer===peer){V.ready=true;vsStatus('房間代碼：'+c+'　等待對手加入…');renderVS()}});
     peer.on('connection',conn=>{
@@ -742,14 +966,10 @@ function vsHost(){
       V.conn=conn;wire(conn);
       conn.on('open',()=>{
         // 限時對戰要求對手是新版：舊版不認得時間限制，會變成一邊倒數、一邊不限時
-        if(V.limit<=0){startMatch();return}
+        // 落後干擾要求版本 3（認得 jam 訊息）
+        if(needV()===0){startMatch();return}
         V.hiTimer=setTimeout(()=>{
-          if(V&&V.conn===conn&&!V.oppV){
-            V.hiTimer=null;
-            V.conn=null;try{conn.close()}catch(e){}
-            vsStatus('對手的頁面是舊版，無法進行限時對戰。請對手把頁面重新開啟兩次更新後再加入');
-            renderVS();
-          }
+          if(V&&V.conn===conn&&!V.oppV){V.hiTimer=null;refuseOld(conn)}
         },2500);
       });
     });
@@ -775,7 +995,7 @@ function vsJoin(){
     V.conn=conn;wire(conn);
     conn.on('open',()=>{
       if(V&&V.conn===conn&&V.phase==='joining')vsStatus('已連線，等待房主開始…');
-      try{conn.send({t:'hi',v:2})}catch(e){}
+      try{conn.send({t:'hi',v:3})}catch(e){}
     });
     setTimeout(()=>{if(V&&V.conn===conn&&V.phase==='joining'&&!conn.open)vsStatus('連線逾時，請確認代碼與網路')},10000);
   });
@@ -804,6 +1024,8 @@ $('#vsToggle').onclick=()=>{
 $('#vsHost').onclick=vsHost;
 $('#vsJoin').onclick=vsJoin;
 $('#vsCancel').onclick=()=>{vsLeave('');lobby=false;render()};
+$('#vsJamBtn').onclick=()=>openPick('jam');
+$('#vsEmoBtn').onclick=()=>openPick('emo');
 $('#vsLeaveBtn').onclick=()=>{if(S.done||confirm('離開對戰？'))vsLeave('')};
 document.querySelectorAll('#vsDiffSeg button').forEach(b=>b.onclick=()=>{
   vsDiff=b.dataset.d;
